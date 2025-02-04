@@ -1,13 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'CloudFormation template to launch EC2 instance with Docker, Git, Python virtual environment, Jupyter server with password pre-installed and auto-start on reboot'
-
-Parameters:
-  AllowedIP:
-    Description: 'The IP address that is allowed to access the instance (in CIDR format, e.g., x.x.x.x/32)'
-    Type: 'String'
-    Default: '0.0.0.0/0'
-    AllowedPattern: '^\d{1,3}(\.\d{1,3}){3}/32$'  # Only allows CIDR IP format
-    ConstraintDescription: 'Must be a valid CIDR IP address (e.g., 192.168.1.1/32)'
+Description: 'CloudFormation template to launch EC2 instance with Docker, Git, Python virtual environment, Jupyter server with password pre-installed, auto-start on reboot, and a 40 GB EBS volume'
 
 Resources:
   EC2Instance:
@@ -22,7 +14,7 @@ Resources:
         - DeviceName: '/dev/sdf'
           Ebs:
             VolumeSize: 40   # 40 GB EBS volume
-            VolumeType: 'gp2' # General Purpose SSD volume type	
+            VolumeType: 'gp2' # General Purpose SSD volume type
       UserData:
         Fn::Base64: |
           #!/bin/bash
@@ -40,38 +32,37 @@ Resources:
 
           # Install Python 3, pip, and virtualenv
           sudo apt-get install -y python3 python3-pip
-	  sudo apt install virtualenv
+          pip3 install virtualenv
 
           # Create a Python virtual environment
-          mkdir /home/ubuntu/myenv
-          cd /home/ubuntu/myenv
+          mkdir /home/ubuntu/llmenv
+          cd /home/ubuntu/llmenv
           virtualenv venv
 
           # Activate virtual environment and install Jupyter server
-          source /home/ubuntu/myenv/venv/bin/activate
+          source /home/ubuntu/llmenv/venv/bin/activate
           pip3 install --upgrade pip
           pip3 install jupyter
 
           # Set a password for Jupyter Notebook server
-          jupyter_password="VR@h290816"  # Replace with your desired password
+          jupyter_password="enter your password here"  # Replace with your desired password
           jupyter_notebook_config="/home/ubuntu/.jupyter/jupyter_notebook_config.py"
 
           # Generate a hashed password for Jupyter Notebook
           python3 -c "from jupyter_server.auth import passwd; print(passwd('${jupyter_password}'))" > /home/ubuntu/jupyter_hash.txt
 
-          # Add the password hash to the Jupyter config file
-          mkdir -p /home/ubuntu/.jupyter
-
           # Ensure the user has proper permissions to modify the Jupyter config file
-	  sudo chown -R ubuntu:ubuntu /home/ubuntu/.jupyter
-          
-	  echo "c.NotebookApp.password = u'$(cat /home/ubuntu/jupyter_hash.txt)'" >> $jupyter_notebook_config
+          mkdir -p /home/ubuntu/.jupyter
+          sudo chown -R ubuntu:ubuntu /home/ubuntu/.jupyter
+
+          # Add the password hash to the Jupyter config file with sudo to ensure proper permissions
+          echo "c.NotebookApp.password = u'$(cat /home/ubuntu/jupyter_hash.txt)'" | sudo tee -a $jupyter_notebook_config
 
           # Clean up the temporary password hash file
           rm /home/ubuntu/jupyter_hash.txt
 
           # Create systemd service for Jupyter notebook to start on reboot
-          cat <<EOT > /etc/systemd/system/jupyter.service
+          cat <<EOT | sudo tee /etc/systemd/system/jupyter.service
           [Unit]
           Description=Jupyter Notebook
           After=network.target
@@ -94,8 +85,8 @@ Resources:
           sudo systemctl start jupyter.service
 
           # Output the Jupyter URL
-          echo "Jupyter Lab Server is running at http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):8888/lab"
-          
+          echo "Jupyter notebook is running at http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):8888"
+
   InstanceSecurityGroup:
     Type: 'AWS::EC2::SecurityGroup'
     Properties:
@@ -104,15 +95,15 @@ Resources:
         - IpProtocol: 'tcp'
           FromPort: '22'
           ToPort: '22'
-          CidrIp: !Ref AllowedIP  # Use the parameter for SSH access
+          CidrIp: '0.0.0.0/0'  # Allowing SSH from any IP (adjust to be more secure if needed)
         - IpProtocol: 'tcp'
           FromPort: '80'
           ToPort: '80'
-          CidrIp: !Ref AllowedIP  # Use the parameter for SSH access
+          CidrIp: '0.0.0.0/0'  # Allowing HTTP traffic from any IP (adjust to be more secure if needed)
         - IpProtocol: 'tcp'
           FromPort: '8888'
           ToPort: '8888'
-          CidrIp: !Ref AllowedIP  # Use the parameter for SSH access
+          CidrIp: '0.0.0.0/0'  # Allowing Jupyter server access on port 8888 (adjust to be more secure if needed)
 
 Outputs:
   InstanceId:
