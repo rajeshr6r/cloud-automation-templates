@@ -70,7 +70,7 @@ Resources:
           [Service]
           Type=simple
           PIDFile=/run/jupyter.pid
-          ExecStart=/home/ubuntu/myenv/venv/bin/jupyter-notebook --config=/home/ubuntu/.jupyter/jupyter_notebook_config.py --ip=0.0.0.0 --port=8888 --no-browser --allow-root
+          ExecStart=/home/ubuntu/llmenv/venv/bin/jupyter-notebook --config=/home/ubuntu/.jupyter/jupyter_notebook_config.py --ip=0.0.0.0 --port=8888 --no-browser --allow-root
           User=ubuntu
           WorkingDirectory=/home/ubuntu
           Restart=always
